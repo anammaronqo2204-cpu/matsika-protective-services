@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #000000;
+  --color-obsidian: #08080a;
+  --color-panel: #0d0d0f;
+  --color-panel-2: #121215;
+  --color-line: #1f2024;
+  --color-line-soft: #17181b;
+  --color-gold: #c9a227;
+  --color-gold-light: #e9c85a;
+  --color-gold-deep: #8f6f12;
+  --color-gold-soft: #e9d9a0;
+  --color-mist: #adadad;
+  --color-mute: #7a7a7a;
+
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-body: "Manrope", system-ui, -apple-system, sans-serif;
+}
+
+html,
+body {
+  background: #000000;
+  color: #f4f4f5;
+}
+
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #c9a227;
+  color: #0a0a0a;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #292929 transparent;
+}
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: #292929;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.75) sepia(1) saturate(4) hue-rotate(2deg);
+  cursor: pointer;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.gold-text {
+  background: linear-gradient(120deg, #f3dd93 0%, #c9a227 45%, #f0d47f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gold-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #c9a227, transparent);
+}
+
+.hairline {
+  border-color: #1f2024;
+}
+
+.panel-grad {
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(201, 162, 39, 0.08) 0%, transparent 55%),
+    #0d0d0f;
+}
+
+.hero-vignette {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.55) 40%, #000000 96%),
+    radial-gradient(90% 70% at 70% 30%, rgba(201, 162, 39, 0.16) 0%, transparent 60%);
+}
+
+.grid-lines {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.noise {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 0.5px, transparent 0.5px);
+  background-size: 4px 4px;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  animation: marquee 38s linear infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(201, 162, 39, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(201, 162, 39, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 162, 39, 0);
+  }
+}
+.pulse-gold {
+  animation: pulse-ring 2.4s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .marquee-track,
+  .pulse-gold {
+    animation: none;
+  }
+}
