@@ -1,15 +1,21 @@
 import { drizzle } from "drizzle-orm/node-postgres";
-import { getConnectionString } from "@netlify/database";
 import { Pool } from "pg";
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
 };
 
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL is not set. Add your Neon connection string as an environment variable in Netlify (Site configuration -> Environment variables)."
+  );
+}
+
 export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
-    connectionString: process.env.DATABASE_URL ?? getConnectionString(),
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
   });
 
 if (process.env.NODE_ENV !== "production") {
