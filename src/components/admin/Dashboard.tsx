@@ -1,50 +1,42 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
-  Activity,
   BadgeCheck,
   Bell,
   Briefcase,
-  ClipboardCheck,
   Clock,
   FileWarning,
-  Inbox,
+  Loader2,
+  MessagesSquare,
   UserCheck,
   Users,
-  XCircle,
-  type LucideIcon,
+  X,
 } from "lucide-react";
 import { Badge, Card } from "@/components/ui";
-import { GRADES, LEAD_STATUS_COLORS, STATUS_COLORS } from "@/lib/constants";
-import { fmtDateTime } from "@/lib/format";
+import { GRADES } from "@/lib/constants";
+import type { AppCandidate } from "@/lib/serialize";
 
-export type Overview = {
-  totals: { total: number; last7: number; notifyOptIn: number; avgExperience: number };
-  vacancyTotals: { open: number; positions: number };
-  statusCounts: { status: string; count: number }[];
-  gradeCounts: { grade: string | null; count: number }[];
-  provinceCounts: { province: string | null; count: number }[];
-  leadCounts: { status: string; count: number }[];
-  recentAudit: { id: number; actor: string; action: string; detail: string; createdAt: string }[];
-  recentCandidates: {
-    id: string;
-    refNumber: string;
-    fullName: string;
-    status: string;
-    province: string | null;
-    psiraGrade: string | null;
-    createdAt: string;
-  }[];
-  recentLeads: {
-    id: number;
-    reference: string;
-    name: string;
-    company: string;
-    service: string;
-    status: string;
-    urgency: string;
-    createdAt: string;
-  }[];
+interface AuditItem {
+  ts: string;
+  actor: string;
+  action: string;
+  detail: string;
+}
+
+const fmtDateTime = (iso: string) => {
+  try {
+    return new Date(iso).toLocaleString("en-ZA", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
 };
 
 function StatCard({
@@ -53,147 +45,133 @@ function StatCard({
   value,
   color,
 }: {
-  icon: LucideIcon;
+  icon: typeof Users;
   label: string;
-  value: number | string;
+  value: number;
   color: string;
 }) {
   return (
-    <Card className="p-4 hover:border-gold/35 transition-colors">
+    <Card className="p-4">
       <div
-        className="w-8 h-8 rounded-lg grid place-items-center mb-3"
+        className="mb-2.5 flex h-8 w-8 items-center justify-center rounded-lg"
         style={{ backgroundColor: color + "1E" }}
       >
         <Icon size={15} style={{ color }} />
       </div>
-      <div className="text-[26px] font-display text-white leading-none">{value}</div>
-      <div className="text-[11px] text-mute mt-1.5">{label}</div>
+      <div className="font-display text-[24px] leading-none text-cream">{value}</div>
+      <div className="mt-1.5 text-[11px] text-dim">{label}</div>
     </Card>
   );
 }
 
-export default function Dashboard({
-  overview,
-  onOpenCandidate,
-  onGoto,
-}: {
-  overview: Overview;
-  onOpenCandidate: (id: string) => void;
-  onGoto: (page: string) => void;
-}) {
-  const count = (status: string) =>
-    overview.statusCounts.find((s) => s.status === status)?.count ?? 0;
+export default function Dashboard() {
+  const [candidates, setCandidates] = useState<AppCandidate[]>([]);
+  const [audit, setAudit] = useState<AuditItem[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const stats: { icon: LucideIcon; label: string; value: number | string; color: string }[] = [
-    { icon: Users, label: "Total candidates", value: overview.totals.total, color: "#C9A227" },
-    { icon: Bell, label: "New applications", value: count("New"), color: "#7DA3C4" },
-    {
-      icon: FileWarning,
-      label: "Documents outstanding",
-      value: count("Documents Outstanding"),
-      color: "#C4703D",
-    },
-    {
-      icon: Clock,
-      label: "Verification pending",
-      value: count("Verification Pending") + count("PSiRA Verification Pending"),
-      color: "#C9A227",
-    },
-    { icon: BadgeCheck, label: "PSiRA verified", value: count("PSiRA Verified"), color: "#4C9A6A" },
-    {
-      icon: ClipboardCheck,
-      label: "Ready for consideration",
-      value: count("Ready for Consideration"),
-      color: "#4C9A6A",
-    },
-    { icon: UserCheck, label: "Shortlisted", value: count("Shortlisted"), color: "#3FA6A6" },
-    { icon: Briefcase, label: "Hired", value: count("Hired"), color: "#4C9A6A" },
-    { icon: XCircle, label: "Inactive / rejected", value: count("Inactive") + count("Rejected"), color: "#7A7A7A" },
+  useEffect(() => {
+    fetch("/api/admin/candidates")
+      .then(async (r) => {
+        if (!r.ok) throw new Error();
+        const data = await r.json();
+        setCandidates(data.candidates || []);
+        setAudit(data.auditLog || []);
+        setUnread(data.unreadMessages || 0);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-20">
+        <Loader2 size={22} className="animate-spin text-gold" />
+      </div>
+    );
+  }
+
+  const count = (fn: (c: AppCandidate) => boolean) => candidates.filter(fn).length;
+  const pipeline = [
+    { label: "New / Screening", color: "#7DA3C4", n: count((c) => c.status === "New" || c.status === "Screening") },
+    { label: "Documents Outstanding", color: "#C4703D", n: count((c) => c.status === "Documents Outstanding") },
+    { label: "Verification Pending", color: "#C9A227", n: count((c) => c.status === "Verification Pending" || c.status === "PSiRA Verification Pending") },
+    { label: "PSiRA Verified / Ready", color: "#4C9A6A", n: count((c) => c.status === "PSiRA Verified" || c.status === "Ready for Consideration") },
+    { label: "Shortlisted / Interview", color: "#3FA6A6", n: count((c) => c.status === "Shortlisted" || c.status === "Interview") },
+    { label: "Selected / Hired", color: "#4C9A6A", n: count((c) => c.status === "Selected" || c.status === "Hired") },
+    { label: "Inactive / Rejected", color: "#7A7A7A", n: count((c) => c.status === "Inactive" || c.status === "Rejected") },
+  ];
+  const maxPipeline = Math.max(1, ...pipeline.map((p) => p.n));
+
+  const stats = [
+    { icon: Users, label: "Total Candidates", value: candidates.length, color: "#C9A227" },
+    { icon: Bell, label: "New Applications", value: count((x) => x.status === "New"), color: "#7DA3C4" },
+    { icon: FileWarning, label: "Documents Outstanding", value: count((x) => x.status === "Documents Outstanding"), color: "#C4703D" },
+    { icon: Clock, label: "Verification Pending", value: count((x) => x.status === "Verification Pending" || x.status === "PSiRA Verification Pending"), color: "#C9A227" },
+    { icon: BadgeCheck, label: "PSiRA Verified", value: count((x) => x.status === "PSiRA Verified" || x.status === "Ready for Consideration"), color: "#4C9A6A" },
+    { icon: UserCheck, label: "Shortlisted / Interview", value: count((x) => x.status === "Shortlisted" || x.status === "Interview"), color: "#3FA6A6" },
+    { icon: Briefcase, label: "Selected / Hired", value: count((x) => x.status === "Selected" || x.status === "Hired"), color: "#4C9A6A" },
+    { icon: X, label: "Inactive / Rejected", value: count((x) => x.status === "Inactive" || x.status === "Rejected"), color: "#7A7A7A" },
   ];
 
-  const totalCandidates = Math.max(overview.totals.total, 1);
-  const openLeads = overview.leadCounts.reduce(
-    (acc, l) => acc + (l.status === "New" || l.status === "Contacted" ? l.count : 0),
-    0,
-  );
-
   return (
-    <div className="p-5 md:p-8 max-w-[1400px]">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-6">
-        <div>
-          <h1 className="font-display text-white text-[26px]">Operations Dashboard</h1>
-          <p className="text-mute text-[13px] mt-1">
-            Live view of the recruitment pipeline, client enquiries and platform activity.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <div className="rounded-lg border border-line bg-panel px-4 py-2.5">
-            <div className="text-[10px] uppercase tracking-[0.14em] text-mute">Last 7 days</div>
-            <div className="text-gold font-display text-[20px] leading-tight">
-              +{overview.totals.last7}
-            </div>
-          </div>
-          <div className="rounded-lg border border-line bg-panel px-4 py-2.5">
-            <div className="text-[10px] uppercase tracking-[0.14em] text-mute">Open posts</div>
-            <div className="text-gold font-display text-[20px] leading-tight">
-              {overview.vacancyTotals.positions}
-            </div>
-          </div>
-          <div className="rounded-lg border border-line bg-panel px-4 py-2.5">
-            <div className="text-[10px] uppercase tracking-[0.14em] text-mute">Open enquiries</div>
-            <div className="text-gold font-display text-[20px] leading-tight">{openLeads}</div>
-          </div>
-        </div>
-      </div>
+    <div className="p-6 md:p-8">
+      {unread > 0 && (
+        <Link
+          href="/admin/messages"
+          className="mb-6 flex items-center gap-3 rounded-lg border border-gold/40 bg-gold/10 px-5 py-4 text-[13px] text-gold-pale transition-colors hover:bg-gold/15"
+        >
+          <MessagesSquare size={16} className="shrink-0 text-gold" />
+          {unread} new client {unread === 1 ? "enquiry" : "enquiries"} awaiting response
+          <span className="ml-auto text-[11px] font-bold uppercase tracking-wide">Open inbox →</span>
+        </Link>
+      )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-7">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {stats.map((s) => (
           <StatCard key={s.label} {...s} />
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
-        <Card className="p-5 lg:col-span-1">
-          <h3 className="text-white font-semibold text-[14px] mb-4">Pipeline by status</h3>
-          <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
-            {overview.statusCounts
-              .slice()
-              .sort((a, b) => b.count - a.count)
-              .map((s) => (
-                <div key={s.status}>
-                  <div className="flex justify-between text-[12px] mb-1">
-                    <span className="text-mist">{s.status}</span>
-                    <span className="text-white font-semibold">{s.count}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-[#161618] overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${Math.round((s.count / totalCandidates) * 100)}%`,
-                        backgroundColor: STATUS_COLORS[s.status] ?? "#C9A227",
-                      }}
-                    />
-                  </div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Card className="p-5">
+          <h3 className="mb-4 text-[14px] font-semibold text-cream">Talent Pipeline</h3>
+          <div className="space-y-3">
+            {pipeline.map((p) => (
+              <div key={p.label}>
+                <div className="mb-1 flex justify-between text-[12px] text-mist">
+                  <span>{p.label}</span>
+                  <span className="font-bold text-cream">{p.n}</span>
                 </div>
-              ))}
+                <div className="h-2 overflow-hidden rounded-full bg-line">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.round((p.n / maxPipeline) * 100)}%`,
+                      background: `linear-gradient(90deg, ${p.color}88, ${p.color})`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
 
         <Card className="p-5">
-          <h3 className="text-white font-semibold text-[14px] mb-4">PSiRA grade distribution</h3>
+          <h3 className="mb-4 text-[14px] font-semibold text-cream">Grade Distribution</h3>
           <div className="space-y-2.5">
             {GRADES.map((g) => {
-              const n = overview.gradeCounts.find((x) => x.grade === g)?.count ?? 0;
-              const pct = Math.round((n / totalCandidates) * 100);
+              const n = count((x) => x.security.psiraGrade === g);
+              const pct = candidates.length ? Math.round((n / candidates.length) * 100) : 0;
               return (
                 <div key={g}>
-                  <div className="flex justify-between text-[12px] text-mist mb-1">
-                    <span>{g === "Not yet registered" ? g : `Grade ${g}`}</span>
-                    <span className="text-white font-semibold">{n}</span>
+                  <div className="mb-1 flex justify-between text-[12px] text-mist">
+                    <span>Grade {g}</span>
+                    <span>{n}</span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-[#161618] overflow-hidden">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-line">
                     <div
-                      className="h-full bg-linear-to-r from-[#C9A227] to-[#E9C85A] rounded-full"
+                      className="h-full rounded-full bg-gradient-to-r from-gold to-gold-light"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -201,122 +179,32 @@ export default function Dashboard({
               );
             })}
           </div>
-          <div className="mt-5 pt-4 border-t border-line-soft grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.14em] text-mute">Avg experience</div>
-              <div className="text-white font-display text-[20px]">
-                {overview.totals.avgExperience} yrs
-              </div>
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.14em] text-mute">Alert opt-ins</div>
-              <div className="text-white font-display text-[20px]">
-                {overview.totals.notifyOptIn}
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-5">
-          <h3 className="text-white font-semibold text-[14px] mb-4">Talent by province</h3>
-          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-            {overview.provinceCounts.map((p) => (
-              <div
-                key={p.province ?? "unknown"}
-                className="flex items-center justify-between text-[12.5px] py-1.5 border-b border-line-soft last:border-0"
-              >
-                <span className="text-mist">{p.province || "Unspecified"}</span>
-                <span className="text-white font-semibold">{p.count}</span>
-              </div>
-            ))}
-          </div>
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 mt-4">
-        <Card className="p-5 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-semibold text-[14px]">Latest applications</h3>
-            <button
-              onClick={() => onGoto("candidates")}
-              className="text-[11.5px] text-gold hover:underline"
-            >
-              View all →
-            </button>
-          </div>
-          <div className="space-y-1">
-            {overview.recentCandidates.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => onOpenCandidate(c.id)}
-                className="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-white/4 transition-colors text-left"
-              >
-                <div className="min-w-0">
-                  <div className="text-[13px] text-white font-medium truncate">{c.fullName}</div>
-                  <div className="text-[11px] text-mute font-mono">
-                    {c.refNumber} · {c.province || "—"} · Grade {c.psiraGrade}
-                  </div>
-                </div>
-                <Badge color={STATUS_COLORS[c.status]}>{c.status}</Badge>
-              </button>
-            ))}
-            {overview.recentCandidates.length === 0 && (
-              <p className="text-mute text-[12.5px] py-6 text-center">No applications yet.</p>
-            )}
-          </div>
-        </Card>
-
-        <Card className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-semibold text-[14px] flex items-center gap-2">
-              <Inbox size={14} className="text-gold" /> Client enquiries
-            </h3>
-            <button
-              onClick={() => onGoto("leads")}
-              className="text-[11.5px] text-gold hover:underline"
-            >
-              Open →
-            </button>
-          </div>
-          <div className="space-y-2.5">
-            {overview.recentLeads.map((l) => (
-              <div key={l.id} className="border border-line rounded-lg px-3 py-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12.5px] text-white font-medium truncate">{l.name}</span>
-                  <Badge color={LEAD_STATUS_COLORS[l.status]}>{l.status}</Badge>
-                </div>
-                <div className="text-[11px] text-mute mt-1 truncate">
-                  {l.company || "Private"} · {l.service || "General"}
-                </div>
-              </div>
-            ))}
-            {overview.recentLeads.length === 0 && (
-              <p className="text-mute text-[12.5px] py-6 text-center">No enquiries yet.</p>
-            )}
-          </div>
-        </Card>
-      </div>
-
-      <Card className="p-5 mt-4">
-        <h3 className="text-white font-semibold text-[14px] mb-4 flex items-center gap-2">
-          <Activity size={14} className="text-gold" /> Activity &amp; audit trail
-        </h3>
-        <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-          {overview.recentAudit.map((a) => (
-            <div key={a.id} className="flex gap-3 text-[12.5px]">
-              <div className="w-1.5 h-1.5 rounded-full bg-gold mt-1.5 shrink-0" />
+      <Card className="mt-6 p-5">
+        <h3 className="mb-4 text-[14px] font-semibold text-cream">Recent Activity</h3>
+        <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
+          {audit.length === 0 && <p className="text-[12.5px] text-dim">No activity yet.</p>}
+          {audit.map((a, i) => (
+            <div key={i} className="flex gap-3 text-[12.5px]">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
               <div className="min-w-0">
-                <div className="text-zinc-300">
-                  {a.action} {a.detail && <span className="text-mute">— {a.detail}</span>}
+                <div className="text-[#D6D6D6]">
+                  {a.action} <span className="text-dim">— {a.detail}</span>
                 </div>
-                <div className="text-[10.5px] text-[#5C5C5C]">
-                  {a.actor} · {fmtDateTime(a.createdAt)}
+                <div className="text-[10.5px] text-faint">
+                  {a.actor} · {fmtDateTime(a.ts)}
                 </div>
               </div>
             </div>
           ))}
         </div>
       </Card>
+
+      <div className="mt-6">
+        <Badge color="#C9A227">{candidates.length} candidates in the pool</Badge>
+      </div>
     </div>
   );
 }

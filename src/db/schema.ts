@@ -1,167 +1,132 @@
 import {
-  pgTable,
+  boolean,
+  integer,
+  jsonb,
   serial,
   text,
-  integer,
-  boolean,
   timestamp,
-  jsonb,
   uuid,
+  pgTable,
 } from "drizzle-orm/pg-core";
 
-/* ------------------------------- Admin users ------------------------------ */
-
-export const adminUsers = pgTable("admin_users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
-  name: text("name").notNull(),
-  role: text("role").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-/* -------------------------------- Candidates ------------------------------ */
-
-export type Qualification = {
+export interface Qualification {
   id: string;
   type: string;
   provider: string;
   completionDate: string;
-};
+}
+
+export interface DocEntry {
+  status: string;
+  filename: string | null;
+  uploadedAt: string | null;
+}
+
+export interface HistoryEntry {
+  status: string;
+  timestamp: string;
+  by: string;
+}
+
+export interface NoteEntry {
+  text: string;
+  timestamp: string;
+  by: string;
+}
 
 export const candidates = pgTable("candidates", {
   id: uuid("id").primaryKey().defaultRandom(),
   seq: serial("seq").notNull(),
-  refNumber: text("ref_number").notNull().default(""),
+  refNumber: text("ref_number").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  demo: boolean("demo").notNull().default(false),
 
-  // Personal
+  /* personal */
   fullName: text("full_name").notNull(),
   idNumber: text("id_number").notNull(),
-  dob: text("dob").default(""),
-  gender: text("gender").default(""),
-  mobile: text("mobile").notNull().default(""),
-  email: text("email").notNull().default(""),
-  address: text("address").default(""),
-  city: text("city").default(""),
-  province: text("province").default(""),
-  preferredAreas: text("preferred_areas").default(""),
-
-  // Security profile
-  psiraNumber: text("psira_number").default(""),
-  psiraGrade: text("psira_grade").default("Not yet registered"),
-  psiraStatus: text("psira_status").default("Not yet verified"),
-  yearsExperience: integer("years_experience").default(0),
-  previousEmployer: text("previous_employer").default(""),
-  previousSites: text("previous_sites").default(""),
-  referenceDetails: text("reference_details").default(""),
-
-  // Training
-  qualifications: jsonb("qualifications").$type<Qualification[]>().default([]).notNull(),
-  firstAid: boolean("first_aid").default(false).notNull(),
-  firefighting: boolean("firefighting").default(false).notNull(),
-  otherTraining: text("other_training").default(""),
-
-  // Availability
-  availability: text("availability").default("Immediately"),
-  shift: text("shift").default("Both"),
-  employmentType: text("employment_type").default("Full-time"),
-  preferredLocations: text("preferred_locations").default(""),
-  appliedForVacancy: text("applied_for_vacancy").default(""),
-
-  // Consent + alerts
-  consentAgreed: boolean("consent_agreed").default(false).notNull(),
-  consentAt: timestamp("consent_at", { withTimezone: true }),
-  notifyEnabled: boolean("notify_enabled").default(false).notNull(),
-  notifyGrade: text("notify_grade").default(""),
-  notifyLocation: text("notify_location").default(""),
-  notifyShift: text("notify_shift").default(""),
-  notifyEmploymentType: text("notify_employment_type").default(""),
-
-  // Workflow
-  status: text("status").notNull().default("New"),
-  isDemo: boolean("is_demo").default(false).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const candidateDocuments = pgTable("candidate_documents", {
-  id: serial("id").primaryKey(),
-  candidateId: uuid("candidate_id").notNull(),
-  docKey: text("doc_key").notNull(),
-  status: text("status").notNull().default("Missing"),
-  filename: text("filename"),
-  mimeType: text("mime_type"),
-  sizeBytes: integer("size_bytes").default(0),
-  dataBase64: text("data_base64"),
-  uploadedAt: timestamp("uploaded_at", { withTimezone: true }),
-  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
-});
-
-export const statusHistory = pgTable("status_history", {
-  id: serial("id").primaryKey(),
-  candidateId: uuid("candidate_id").notNull(),
-  status: text("status").notNull(),
-  changedBy: text("changed_by").notNull().default("System"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const internalNotes = pgTable("internal_notes", {
-  id: serial("id").primaryKey(),
-  candidateId: uuid("candidate_id").notNull(),
-  body: text("body").notNull(),
-  author: text("author").notNull().default("Admin"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-/* -------------------------------- Audit log ------------------------------- */
-
-export const auditLog = pgTable("audit_log", {
-  id: serial("id").primaryKey(),
-  actor: text("actor").notNull().default("System"),
-  action: text("action").notNull(),
-  detail: text("detail").default(""),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-/* ------------------------------ Client leads ------------------------------ */
-
-export const leads = pgTable("leads", {
-  id: serial("id").primaryKey(),
-  reference: text("reference").notNull().default(""),
-  name: text("name").notNull(),
-  company: text("company").default(""),
+  dob: text("dob"),
+  gender: text("gender"),
+  mobile: text("mobile").notNull(),
   email: text("email").notNull(),
-  phone: text("phone").notNull().default(""),
-  service: text("service").default(""),
-  sector: text("sector").default(""),
-  province: text("province").default(""),
-  siteAddress: text("site_address").default(""),
-  urgency: text("urgency").default("Standard"),
-  message: text("message").default(""),
-  status: text("status").notNull().default("New"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+  address: text("address"),
+  city: text("city"),
+  province: text("province").notNull(),
+  preferredAreas: text("preferred_areas"),
 
-/* -------------------------------- Vacancies ------------------------------- */
+  /* security */
+  psiraNumber: text("psira_number"),
+  psiraGrade: text("psira_grade").notNull().default("Not yet registered"),
+  psiraStatus: text("psira_status").notNull().default("Not yet verified"),
+  yearsExperience: integer("years_experience").notNull().default(0),
+  previousEmployer: text("previous_employer"),
+  previousSites: text("previous_sites"),
+  referenceDetails: text("reference_details"),
 
-export const vacancies = pgTable("vacancies", {
-  id: serial("id").primaryKey(),
-  code: text("code").notNull().default(""),
-  title: text("title").notNull(),
-  location: text("location").notNull().default(""),
-  province: text("province").notNull().default(""),
-  grade: text("grade").notNull().default("C"),
+  /* training */
+  qualifications: jsonb("qualifications")
+    .$type<Qualification[]>()
+    .notNull()
+    .default([]),
+  firstAid: boolean("first_aid").notNull().default(false),
+  firefighting: boolean("firefighting").notNull().default(false),
+  otherCertificates: text("other_certificates"),
+
+  /* availability */
+  availability: text("availability").notNull().default("Immediately"),
   shift: text("shift").notNull().default("Both"),
   employmentType: text("employment_type").notNull().default("Full-time"),
-  summary: text("summary").notNull().default(""),
-  requirements: jsonb("requirements").$type<string[]>().default([]).notNull(),
-  positions: integer("positions").default(1).notNull(),
-  isOpen: boolean("is_open").default(true).notNull(),
-  postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
+  preferredLocations: text("preferred_locations"),
+
+  /* documents */
+  documents: jsonb("documents").$type<Record<string, DocEntry>>().notNull().default({}),
+
+  /* notifications */
+  notifyEnabled: boolean("notify_enabled").notNull().default(false),
+  notifyGrade: text("notify_grade"),
+  notifyLocation: text("notify_location"),
+  notifyShift: text("notify_shift"),
+  notifyEmploymentType: text("notify_employment_type"),
+
+  /* consent */
+  consentAgreed: boolean("consent_agreed").notNull().default(false),
+  consentTimestamp: timestamp("consent_timestamp", { withTimezone: true }),
+
+  /* workflow */
+  status: text("status").notNull().default("New"),
+  statusHistory: jsonb("status_history").$type<HistoryEntry[]>().notNull().default([]),
+  internalNotes: jsonb("internal_notes").$type<NoteEntry[]>().notNull().default([]),
 });
 
-export type Candidate = typeof candidates.$inferSelect;
-export type CandidateDocument = typeof candidateDocuments.$inferSelect;
-export type Lead = typeof leads.$inferSelect;
-export type Vacancy = typeof vacancies.$inferSelect;
-export type AdminUser = typeof adminUsers.$inferSelect;
+export const contactMessages = pgTable("contact_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  company: text("company"),
+  service: text("service"),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  handled: boolean("handled").notNull().default(false),
+});
+
+export const adminUsers = pgTable("admin_users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ts: timestamp("ts", { withTimezone: true }).notNull().defaultNow(),
+  actor: text("actor").notNull(),
+  action: text("action").notNull(),
+  detail: text("detail").notNull().default(""),
+});
+
+export type CandidateRow = typeof candidates.$inferSelect;
+export type ContactMessageRow = typeof contactMessages.$inferSelect;
+export type AdminUserRow = typeof adminUsers.$inferSelect;
+export type AuditLogRow = typeof auditLogs.$inferSelect;

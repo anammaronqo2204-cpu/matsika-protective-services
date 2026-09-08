@@ -1,78 +1,61 @@
-import { cookies } from "next/headers";
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS } from "@/lib/session-constants";
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 
-const SECRET =
-  process.env.SESSION_SECRET || process.env.DATABASE_URL || "matsika-dev-secret-key";
+const SECRET = process.env.AUTH_SECRET || "mps-dev-secret-change-before-prod";
 
-export { SESSION_COOKIE };
-const MAX_AGE_SECONDS = SESSION_MAX_AGE_SECONDS;
-
-export type SessionUser = {
-  id: number;
-  username: string;
-  name: string;
-  role: string;
-  exp: number;
-};
+const COOKIE_NAME = "mps_admin_session";
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
-  const derived = scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${derived}`;
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
 }
 
 export function verifyPassword(password: string, stored: string): boolean {
-  try {
-    const [salt, key] = stored.split(":");
-    if (!salt || !key) return false;
-    const derived = scryptSync(password, salt, 64);
-    const expected = Buffer.from(key, "hex");
-    if (expected.length !== derived.length) return false;
-    return timingSafeEqual(derived, expected);
-  } catch {
-    return false;
-  }
+  const [salt, hash] = stored.split(":");
+  if (!salt || !hash) return false;
+  const test = scryptSync(password, salt, 64);
+  const expected = Buffer.from(hash, "hex");
+  return test.length === expected.length && timingSafeEqual(test, expected);
 }
 
-function sign(payload: string): string {
-  return createHmac("sha256", SECRET).update(payload).digest("base64url");
+export function signSessionToken(username: string): string {
+  const exp = Date.now() + SESSION_TTL_MS;
+  const payload = `${username}.${exp}`;
+  const sig = createHmac("sha256", SECRET)
+    .update(payload)
+    .digest("hex")
+    .slice(0, 32);
+  return `${payload}.${sig}`;
 }
 
-export function createSessionToken(user: Omit<SessionUser, "exp">): string {
-  const session: SessionUser = {
-    ...user,
-    exp: Date.now() + MAX_AGE_SECONDS * 1000,
-  };
-  const payload = Buffer.from(JSON.stringify(session)).toString("base64url");
-  return `${payload}.${sign(payload)}`;
-}
-
-export function readSessionToken(token: string | undefined): SessionUser | null {
+export function verifySessionToken(
+  token: string | null | undefined
+): { username: string } | null {
   if (!token) return null;
-  const [payload, signature] = token.split(".");
-  if (!payload || !signature) return null;
-  const expected = sign(payload);
-  if (expected.length !== signature.length) return null;
-  if (!timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) return null;
-  try {
-    const session = JSON.parse(Buffer.from(payload, "base64url").toString()) as SessionUser;
-    if (!session.exp || session.exp < Date.now()) return null;
-    return session;
-  } catch {
-    return null;
-  }
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [username, expStr, sig] = parts;
+  const exp = Number(expStr);
+  if (!exp || !Number.isFinite(exp) || exp < Date.now()) return null;
+  const expected = createHmac("sha256", SECRET)
+    .update(`${username}.${exp}`)
+    .digest("hex")
+    .slice(0, 32);
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return null;
+  return timingSafeEqual(a, b) ? { username } : null;
 }
 
-export async function getSession(): Promise<SessionUser | null> {
-  const store = await cookies();
-  return readSessionToken(store.get(SESSION_COOKIE)?.value);
+export function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_TTL_MS / 1000,
+  };
 }
 
-export const sessionCookieOptions = {
-  httpOnly: true,
-  sameSite: "lax" as const,
-  path: "/",
-  maxAge: MAX_AGE_SECONDS,
-  secure: process.env.NODE_ENV === "production",
-};
+export { COOKIE_NAME };
