@@ -132,13 +132,13 @@ export default function HomePage() {
         </section>
 
         <section className="border-b border-line bg-black">
-          <div className="mx-auto grid max-w-7xl divide-y divide-line px-6 md:grid-cols-3 md:divide-x md:divide-y-0 md:px-8">
+          <div className="mx-auto grid max-w-7xl divide-y divide-line px-6 md:grid-cols-3 md:divide-x md:divide-y-0 md:px-10">
             {principles.map(([number, title, text], i) => (
               <Reveal key={number} delay={i * 110}>
-                <div className="group py-8 transition-colors duration-300 hover:bg-white/[0.02] md:px-8 md:first:pl-0 md:last:pr-0">
-                  <span className="inline-block text-[11px] font-bold text-gold transition-transform duration-300 group-hover:-translate-y-1">{number}</span>
-                  <h2 className="mt-3 text-[15px] font-semibold text-white">{title}</h2>
-                  <p className="mt-2 text-[13px] leading-6 text-dim">{text}</p>
+                <div className="group py-12 transition-colors duration-300 hover:bg-white/[0.02] md:px-10 md:first:pl-0 md:last:pr-0">
+                  <span className="inline-block text-[11px] font-bold text-gold transition-transform duration-300 group-hover:-translate-y-1 mb-1">{number}</span>
+                  <h2 className="mt-4 text-[15px] font-semibold text-white">{title}</h2>
+                  <p className="mt-3 text-[13px] leading-7 text-dim">{text}</p>
                 </div>
               </Reveal>
             ))}
@@ -296,15 +296,3 @@ export default function HomePage() {
             <div className="mt-8 border-l-2 border-gold pl-5 transition-colors duration-300 hover:border-gold-pale">
               <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-dim">24-hour contact</p>
               <a href="tel:0860628747" className="mt-2 block text-[22px] font-semibold text-white transition-colors hover:text-gold">0860 628 747</a>
-            </div>
-          </Reveal>
-          <Reveal delay={140}>
-            <ContactForm />
-          </Reveal>
-        </section>
-      </main>
-
-      <SiteFooter />
-    </div>
-  );
-}
