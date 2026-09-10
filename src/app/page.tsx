@@ -296,3 +296,16 @@ export default function HomePage() {
             <div className="mt-8 border-l-2 border-gold pl-5 transition-colors duration-300 hover:border-gold-pale">
               <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-dim">24-hour contact</p>
               <a href="tel:0860628747" className="mt-2 block text-[22px] font-semibold text-white transition-colors hover:text-gold">0860 628 747</a>
+            </div>
+          </Reveal>
+
+          <Reveal delay={120}>
+            <ContactForm />
+          </Reveal>
+        </section>
+      </main>
+
+      <SiteFooter />
+    </div>
+  );
+}
